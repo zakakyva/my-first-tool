@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Community Challenges (Prototype)</title>
+  <style>
+    body{font-family:Arial, sans-serif; max-width:900px; margin:40px auto; padding:0 16px; line-height:1.5}
+    .card{border:1px solid #ddd; border-radius:12px; padding:16px; margin:12px 0}
+    .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px}
+    button{padding:10px 14px; border-radius:10px; border:1px solid #ccc; background:#fff; cursor:pointer}
+    input{padding:10px 12px; border-radius:10px; border:1px solid #ccc; width:100%}
+    .muted{color:#666}
+  </style>
+</head>
+<body>
+  <h1>Anonymous Communities — Prototype</h1>
+  <p class="muted">A safe place to support each other with daily challenges. (Prototype page only)</p>
+
+  <div class="card">
+    <h2>Create a nickname</h2>
+    <input id="nick" placeholder="e.g., Atlas_23" />
+    <button onclick="saveNick()">Save</button>
+    <p id="nickShow" class="muted"></p>
+  </div>
+
+  <div class="card">
+    <h2>Choose a community</h2>
+    <div class="grid">
+      <button onclick="openCommunity('Smoking')">🚭 Smoking</button>
+      <button onclick="openCommunity('Gambling')">🎲 Gambling</button>
+      <button onclick="openCommunity('Alcohol')">🍺 Alcohol</button>
+      <button onclick="openCommunity('Porn')">🧠 Porn</button>
+    </div>
+  </div>
+
+  <div id="community" class="card" style="display:none;">
+    <h2 id="cTitle"></h2>
+    <p><b>Today’s challenge:</b> <span id="challenge"></span></p>
+    <p class="muted">Post (demo):</p>
+    <input id="postText" placeholder="Write something supportive (demo only)" />
+    <button onclick="addPost()">Post</button>
+    <ul id="posts"></ul>
+  </div>
+
+  <script>
+    const challenges = {
+      Smoking: "Delay the urge by 10 minutes, drink water, and breathe slowly.",
+      Gambling: "Write your trigger. Then do 5 minutes of walking instead.",
+      Alcohol: "Text a friend or write 3 reasons you want to change.",
+      Porn: "Close the trigger tab/app, do 20 pushups or a cold face wash."
+    };
+
+    function saveNick(){
+      const n = document.getElementById('nick').value.trim();
+      if(!n) return alert("Write a nickname first.");
+      localStorage.setItem('nick', n);
+      document.getElementById('nickShow').innerText = "Saved as: " + n;
+    }
+
+    function openCommunity(name){
+      document.getElementById('community').style.display = 'block';
+      document.getElementById('cTitle').innerText = "Community: " + name;
+      document.getElementById('challenge').innerText = challenges[name] || "Stay strong today.";
+      document.getElementById('posts').innerHTML = "";
+    }
+
+    function addPost(){
+      const text = document.getElementById('postText').value.trim();
+      if(!text) return;
+      const nick = localStorage.getItem('nick') || "Anonymous";
+      const li = document.createElement('li');
+      li.innerText = nick + ": " + text;
+      document.getElementById('posts').appendChild(li);
+      document.getElementById('postText').value = "";
+    }
+
+    // show saved nick if exists
+    const saved = localStorage.getItem('nick');
+    if(saved) document.getElementById('nickShow').innerText = "Saved as: " + saved;
+  </script>
+</body>
+</html>
