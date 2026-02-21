@@ -1,83 +1,233 @@
 <!doctype html>
-<html lang="en">
+<html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Community Challenges (Prototype)</title>
+  <title>Anonymous Communities</title>
   <style>
     body{font-family:Arial, sans-serif; max-width:900px; margin:40px auto; padding:0 16px; line-height:1.5}
     .card{border:1px solid #ddd; border-radius:12px; padding:16px; margin:12px 0}
     .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px}
     button{padding:10px 14px; border-radius:10px; border:1px solid #ccc; background:#fff; cursor:pointer}
     input{padding:10px 12px; border-radius:10px; border:1px solid #ccc; width:100%}
+    .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
     .muted{color:#666}
+    .hidden{display:none}
+    .ok{color:green}
+    .err{color:#b00020}
+    .small{font-size:12px}
   </style>
 </head>
-<body>
-  <h1>Anonymous Communities — Prototype</h1>
-  <p class="muted">A safe place to support each other with daily challenges. (Prototype page only)</p>
 
-  <div class="card">
-    <h2>Create a nickname</h2>
+<body>
+  <h1>Anonymous Communities</h1>
+  <p class="muted">Prototype with real login (Email + Password) using Supabase.</p>
+
+  <div id="status" class="card hidden"></div>
+
+  <!-- AUTH -->
+  <div id="authBox" class="card">
+    <h2>Login / Sign up</h2>
+
+    <div class="row">
+      <input id="email" type="email" placeholder="Email" autocomplete="email" />
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+    </div>
+
+    <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button id="btnSignup">Sign up</button>
+      <button id="btnLogin">Login</button>
+      <button id="btnLogout" class="hidden">Logout</button>
+    </div>
+
+    <p id="who" class="muted"></p>
+
+    <hr />
+
+    <h3>Nickname (anonymous display name)</h3>
     <input id="nick" placeholder="e.g., Atlas_23" />
-    <button onclick="saveNick()">Save</button>
-    <p id="nickShow" class="muted"></p>
+    <button id="btnSaveNick" style="margin-top:10px;">Save Nickname</button>
+    <p class="muted small">Nickname is stored in your browser for now (prototype).</p>
   </div>
 
-  <div class="card">
+  <!-- APP -->
+  <div id="appBox" class="card hidden">
     <h2>Choose a community</h2>
+
     <div class="grid">
-      <button onclick="openCommunity('Smoking')">🚭 Smoking</button>
-      <button onclick="openCommunity('Gambling')">🎲 Gambling</button>
-      <button onclick="openCommunity('Alcohol')">🍺 Alcohol</button>
-      <button onclick="openCommunity('Porn')">🧠 Porn</button>
+      <button class="cbtn" data-c="smoking">🚭 Smoking</button>
+      <button class="cbtn" data-c="gambling">🎲 Gambling</button>
+      <button class="cbtn" data-c="alcohol">🍺 Alcohol</button>
+      <button class="cbtn" data-c="porn">🧠 Porn</button>
+    </div>
+
+    <div id="community" class="card hidden" style="margin-top:16px;">
+      <h3 id="cTitle"></h3>
+      <p><b>Today’s challenge:</b> <span id="challenge"></span></p>
+
+      <p class="muted">Post (saved in database):</p>
+      <input id="postText" placeholder="Write something supportive..." />
+      <button id="btnPost" style="margin-top:10px;">Post</button>
+
+      <h4 style="margin-top:16px;">Latest posts</h4>
+      <ul id="posts"></ul>
     </div>
   </div>
 
-  <div id="community" class="card" style="display:none;">
-    <h2 id="cTitle"></h2>
-    <p><b>Today’s challenge:</b> <span id="challenge"></span></p>
-    <p class="muted">Post (demo):</p>
-    <input id="postText" placeholder="Write something supportive (demo only)" />
-    <button onclick="addPost()">Post</button>
-    <ul id="posts"></ul>
-  </div>
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
+    // ✅ Your Supabase URL (confirmed from your Project ID)
+    const SUPABASE_URL = "https://qweigxvclvpjtomdvjlq.supabase.co";
+
+    // ⚠️ Paste ONLY the Publishable key here (sb_publishable_...)
+    // From Supabase: Settings → API Keys → Publishable key
+    const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_-0X7t6No2xJpyuHJVJzOCg_-4eM_I9D";
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
     const challenges = {
-      Smoking: "Delay the urge by 10 minutes, drink water, and breathe slowly.",
-      Gambling: "Write your trigger. Then do 5 minutes of walking instead.",
-      Alcohol: "Text a friend or write 3 reasons you want to change.",
-      Porn: "Close the trigger tab/app, do 20 pushups or a cold face wash."
+      smoking: "Delay the urge by 10 minutes, drink water, and breathe slowly.",
+      gambling: "Write your trigger. Then do 5 minutes of walking instead.",
+      alcohol: "Text a friend or write 3 reasons you want to change.",
+      porn: "Close the trigger app, do some movement, and refocus for 10 minutes."
     };
 
-    function saveNick(){
-      const n = document.getElementById('nick').value.trim();
-      if(!n) return alert("Write a nickname first.");
-      localStorage.setItem('nick', n);
-      document.getElementById('nickShow').innerText = "Saved as: " + n;
+    const statusBox = document.getElementById("status");
+    const appBox = document.getElementById("appBox");
+    const who = document.getElementById("who");
+    const btnLogout = document.getElementById("btnLogout");
+
+    function showStatus(msg, ok=true){
+      statusBox.classList.remove("hidden");
+      statusBox.className = "card " + (ok ? "ok" : "err");
+      statusBox.textContent = msg;
+      setTimeout(()=>statusBox.classList.add("hidden"), 4500);
     }
 
-    function openCommunity(name){
-      document.getElementById('community').style.display = 'block';
-      document.getElementById('cTitle').innerText = "Community: " + name;
-      document.getElementById('challenge').innerText = challenges[name] || "Stay strong today.";
-      document.getElementById('posts').innerHTML = "";
+    function getNick(){
+      return localStorage.getItem("nick") || "Anonymous";
     }
 
-    function addPost(){
-      const text = document.getElementById('postText').value.trim();
-      if(!text) return;
-      const nick = localStorage.getItem('nick') || "Anonymous";
-      const li = document.createElement('li');
-      li.innerText = nick + ": " + text;
-      document.getElementById('posts').appendChild(li);
-      document.getElementById('postText').value = "";
+    document.getElementById("btnSaveNick").onclick = () => {
+      const n = document.getElementById("nick").value.trim();
+      if(!n) return showStatus("Write a nickname first.", false);
+      localStorage.setItem("nick", n);
+      showStatus("Nickname saved ✅");
+    };
+
+    async function refreshSession(){
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if(error) return showStatus(error.message, false);
+
+      if(session?.user){
+        who.textContent = "Logged in as: " + session.user.email;
+        appBox.classList.remove("hidden");
+        btnLogout.classList.remove("hidden");
+      } else {
+        who.textContent = "";
+        appBox.classList.add("hidden");
+        btnLogout.classList.add("hidden");
+      }
     }
 
-    // show saved nick if exists
-    const saved = localStorage.getItem('nick');
-    if(saved) document.getElementById('nickShow').innerText = "Saved as: " + saved;
+    document.getElementById("btnSignup").onclick = async () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+      if(!email || !password) return showStatus("Email + password required.", false);
+
+      const { error } = await supabase.auth.signUp({ email, password });
+      if(error) return showStatus(error.message, false);
+
+      showStatus("Signed up ✅ Now login.", true);
+      await refreshSession();
+    };
+
+    document.getElementById("btnLogin").onclick = async () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+      if(!email || !password) return showStatus("Email + password required.", false);
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if(error) return showStatus(error.message, false);
+
+      showStatus("Logged in ✅");
+      await refreshSession();
+    };
+
+    btnLogout.onclick = async () => {
+      const { error } = await supabase.auth.signOut();
+      if(error) return showStatus(error.message, false);
+      showStatus("Logged out.");
+      await refreshSession();
+    };
+
+    // community UI
+    document.querySelectorAll(".cbtn").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        const c = btn.dataset.c;
+        document.getElementById("community").classList.remove("hidden");
+        document.getElementById("cTitle").textContent = "Community: " + c;
+        document.getElementById("challenge").textContent = challenges[c] || "Stay strong today.";
+        window.currentCommunity = c;
+        await loadPosts(c);
+      });
+    });
+
+    async function loadPosts(community){
+      const ul = document.getElementById("posts");
+      ul.innerHTML = "Loading...";
+
+      const { data, error } = await supabase
+        .from("posts")
+        .select("id, community, nickname, body, created_at")
+        .eq("community", community)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if(error){
+        ul.innerHTML = "";
+        return showStatus("DB error: " + error.message, false);
+      }
+
+      ul.innerHTML = "";
+      data.forEach(p=>{
+        const li = document.createElement("li");
+        li.textContent = `${p.nickname}: ${p.body}`;
+        ul.appendChild(li);
+      });
+    }
+
+    document.getElementById("btnPost").onclick = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if(!session?.user) return showStatus("Login first.", false);
+
+      const body = document.getElementById("postText").value.trim();
+      if(!body) return;
+
+      const community = window.currentCommunity;
+      if(!community) return showStatus("Choose a community first.", false);
+
+      const nickname = getNick();
+
+      const { error } = await supabase.from("posts").insert([{
+        user_id: session.user.id,
+        community,
+        nickname,
+        body
+      }]);
+
+      if(error) return showStatus("Insert error: " + error.message, false);
+
+      document.getElementById("postText").value = "";
+      showStatus("Posted ✅");
+      await loadPosts(community);
+    };
+
+    // init
+    refreshSession();
+    supabase.auth.onAuthStateChange(() => refreshSession());
   </script>
 </body>
 </html>
